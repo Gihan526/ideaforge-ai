@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
-import Header from "@/components/header";
+
 import "./globals.css";
 
 
@@ -26,7 +26,7 @@ export default function RootLayout({
       className={`${roboto.variable} h-full`}
     >
       <body className="flex min-h-screen w-full flex-col">
-        <Header />
+        
         {children}
       </body>
     </html>
