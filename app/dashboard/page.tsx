@@ -1,14 +1,13 @@
+import { createIdeas } from "@/actions/action";
+import AddIdeas from "@/components/add-ideas";
 
-import AddIdeas from '@/components/add-ideas'
-import React from 'react'
-
-function page() {
+function Page() {
   return (
-    
-    <div>
-      <AddIdeas />
+    <div className="flex items-start">
+      <AddIdeas action={createIdeas} status="Not started" badgeLabel="Not started" buttonLabel="New Idea" />
+      <AddIdeas action={createIdeas} status="In progress" badgeLabel="In progress" />
+      <AddIdeas action={createIdeas} status="Completed" badgeLabel="Completed" />
     </div>
-  )
+  );
 }
-
-export default page
+export default Page;
