@@ -12,6 +12,9 @@ export async function createIdeas(formData: FormData) {
     throw new Error("Title and content are required");
   }
 
+  //server action testing - worked
+  console.log(title ,content ,status)
+
   await db.insert(ideas).values({
     userId: "",
     title,

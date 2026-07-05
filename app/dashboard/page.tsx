@@ -4,9 +4,9 @@ import AddIdeas from "@/components/add-ideas";
 function Page() {
   return (
     <div className="flex items-start">
-      <AddIdeas action={createIdeas} status="Not started" badgeLabel="Not started" buttonLabel="New Idea" />
-      <AddIdeas action={createIdeas} status="In progress" badgeLabel="In progress" />
-      <AddIdeas action={createIdeas} status="Completed" badgeLabel="Completed" />
+      <AddIdeas action={createIdeas} badgeLabel="Not started" buttonLabel="New Idea" />
+      <AddIdeas action={createIdeas} badgeLabel="In progress" />
+      <AddIdeas action={createIdeas} badgeLabel="Completed" />
     </div>
   );
 }
