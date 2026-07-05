@@ -20,12 +20,10 @@ import {
 
 function AddIdeas({
   action,
-  status = "Not started",
   buttonLabel = "New page",
   badgeLabel = "Not started",
 }: {
   action: (formData: FormData) => void;
-  status?: string;
   buttonLabel?: string;
   badgeLabel?: string;
 }) {
@@ -42,9 +40,13 @@ function AddIdeas({
   useEscapeKey(closeInput, show && !selectOpen);
 
   return (
-    <div className="m-10 w-68 rounded-lg bg-[#fbfaf9] p-2 border-[#E3E2E0] border ">
-      <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#e3e2e0] px-2 py-0.5 text-xs font-medium text-[#37352f] ">
-        <span className="size-1.5 rounded-full bg-[#9ca3af]" />
+    <div
+      className={`m-10 w-68 rounded-lg ${badgeLabel === "In progress" ? "bg-[#F3F9FD]" : badgeLabel === "Completed" ? "bg-[#F6F9F7]" : "bg-[#fbfaf9]"} p-2 border-[#E3E2E0] border `}
+    >
+      <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#C1DEF5] text-[#075985]" : badgeLabel === "Completed" ? "bg-[#CFE1D6] text-[#166534]" : "bg-[#E1DFDC] text-[#4B5563]"} px-2.5 py-1 text-xs font-medium`}>
+        <span
+          className={`size-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#0EA5E9]" : badgeLabel === "Completed" ? "bg-[#22C55E]" : "bg-[#9CA3AF]"}`}
+        />
         {badgeLabel}
       </div>
 
@@ -69,7 +71,11 @@ function AddIdeas({
             placeholder="Enter title"
           />
 
-          <Select name="status" value={status} onOpenChange={setSelectOpen}>
+          <Select
+            name="status"
+            defaultValue="Not started"
+            onOpenChange={setSelectOpen}
+          >
             <SelectTrigger className="w-full h-8 rounded-lg border-[#e3e2e0] bg-white px-2.5 text-xs font-normal text-[#37352f]">
               <SelectValue placeholder="Theme" />
             </SelectTrigger>
@@ -88,6 +94,14 @@ function AddIdeas({
             className="w-full resize-none rounded-lg border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-xs"
             placeholder="Enter description"
           />
+
+          <Button
+            type="submit"
+            className="h-8 w-full justify-center gap-1.5 rounded-lg bg-[#37352f] px-2.5 text-xs font-medium text-white hover:bg-[#1f1f1d] "
+          >
+            <Plus className="size-3.5"  />
+            Submit
+          </Button>
         </form>
       )}
     </div>
