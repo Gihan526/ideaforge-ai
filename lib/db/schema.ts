@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { defineRelations } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -95,29 +95,34 @@ export const ideas = pgTable(
   (table) => [index("ideas_userId_idx").on(table.userId)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  ideas: many(ideas),
-}));
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id],
+export const relations = defineRelations(
+  { user, session, account, verification, ideas },
+  (r) => ({
+    user: {
+      sessions: r.many.session(),
+      accounts: r.many.account(),
+      ideas: r.many.ideas(),
+    },
+    session: {
+      user: r.one.user({
+        from: r.session.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+    },
+    account: {
+      user: r.one.user({
+        from: r.account.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+    },
+    ideas: {
+      user: r.one.user({
+        from: r.ideas.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+    },
   }),
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id],
-  }),
-}));
-
-export const ideasRelations = relations(ideas, ({ one }) => ({
-  user: one(user, {
-    fields: [ideas.userId],
-    references: [user.id],
-  }),
-}));
+);
