@@ -18,14 +18,24 @@ import {
 } from "@/components/ui/select";
 // import { serverHooks } from "next/dist/build/templates/app-route";
 
+type Idea = {
+  ideaId: number;
+  title: string;
+  description: string | null;
+  status: string;
+  createdAt: Date;
+};
+
 function AddIdeas({
   action,
   buttonLabel = "New page",
   badgeLabel = "Not started",
+  ideas = [],
 }: {
   action: (formData: FormData) => void;
   buttonLabel?: string;
   badgeLabel?: string;
+  ideas?: Idea[];
 }) {
   const [show, setShow] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
@@ -43,21 +53,52 @@ function AddIdeas({
     <div
       className={`m-10 w-68 rounded-lg ${badgeLabel === "In progress" ? "bg-[#F3F9FD]" : badgeLabel === "Completed" ? "bg-[#F6F9F7]" : "bg-[#fbfaf9]"} p-2 border-[#E3E2E0] border `}
     >
-      <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#C1DEF5] text-[#075985]" : badgeLabel === "Completed" ? "bg-[#CFE1D6] text-[#166534]" : "bg-[#E1DFDC] text-[#4B5563]"} px-2.5 py-1 text-xs font-medium`}>
+      <div
+        className={`mb-2 inline-flex items-center gap-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#C1DEF5] text-[#075985]" : badgeLabel === "Completed" ? "bg-[#CFE1D6] text-[#166534]" : "bg-[#E1DFDC] text-[#4B5563]"} px-2.5 py-1 text-xs font-medium`}
+      >
         <span
           className={`size-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#0EA5E9]" : badgeLabel === "Completed" ? "bg-[#22C55E]" : "bg-[#9CA3AF]"}`}
         />
         {badgeLabel}
       </div>
 
-      <Button
-        className="h-8 w-full justify-start gap-1.5 rounded-lg border border-[#e3e2e0] bg-[#f7f6f3] px-2.5 text-xs font-medium text-[#37352f] shadow-none hover:bg-[#ebece9]"
-        variant="outline"
-        onClick={() => setShow(true)}
-      >
-        <Plus className="size-3.5 text-[#6b6b6b]" />
-        {buttonLabel}
-      </Button>
+      <div className="flex flex-col gap-1.5 mb-4">
+        {ideas.length === 0 ? (
+          <Button
+            className="h-8 w-full justify-start gap-1.5 rounded-lg border border-[#e3e2e0] bg-[#f7f6f3] px-2.5 text-xs font-medium text-[#37352f] shadow-none hover:bg-[#ebece9]"
+            variant="outline"
+            onClick={() => setShow(true)}
+          >
+            <Plus className="size-3.5 text-[#6b6b6b]" />
+            {buttonLabel}
+          </Button>
+        ) : (
+          ideas.map((idea) => (
+            <div
+              key={idea.ideaId}
+              className="rounded-lg border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-xs hover:bg-[#f7f6f3] cursor-pointer"
+            >
+              <p className="font-medium text-[#37352f] truncate">{idea.title}</p>
+              {idea.description && (
+                <p className="text-[#787774] mt-0.5 line-clamp-2">
+                  {idea.description}
+                </p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {ideas.length > 0 && (
+        <Button
+          className="h-8 w-full justify-start gap-1.5 rounded-lg border border-[#e3e2e0] bg-[#f7f6f3] px-2.5 text-xs font-medium text-[#37352f] shadow-none hover:bg-[#ebece9]"
+          variant="outline"
+          onClick={() => setShow(true)}
+        >
+          <Plus className="size-3.5 text-[#6b6b6b]" />
+          {buttonLabel}
+        </Button>
+      )}
 
       {show && (
         <form
@@ -99,7 +140,7 @@ function AddIdeas({
             type="submit"
             className="h-8 w-full justify-center gap-1.5 rounded-lg bg-[#37352f] px-2.5 text-xs font-medium text-white hover:bg-[#1f1f1d] "
           >
-            <Plus className="size-3.5"  />
+            <Plus className="size-3.5" />
             Submit
           </Button>
         </form>

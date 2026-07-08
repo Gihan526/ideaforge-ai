@@ -5,7 +5,7 @@ import {
   timestamp,
   boolean,
   index,
-  serial,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -83,7 +83,7 @@ export const verification = pgTable(
 export const ideas = pgTable(
   "ideas",
   {
-    ideaId: serial("idea_id").primaryKey(),
+    ideaId: integer("idea_id").primaryKey().generatedByDefaultAsIdentity(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
