@@ -2,12 +2,14 @@
 
 import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { Trash2 } from "reicon-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
-// import { createIdeas } from "@/actions/action";
+import { cn } from "@/lib/utils";
+
 import {
   Select,
   SelectContent,
@@ -16,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// import { serverHooks } from "next/dist/build/templates/app-route";
+import { deleteIdea } from "@/actions/action";
+
 
 type Idea = {
   ideaId: number;
@@ -78,12 +81,14 @@ function AddIdeas({
               key={idea.ideaId}
               className="rounded-lg border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-xs hover:bg-[#f7f6f3] cursor-pointer"
             >
-              <p className="font-medium text-[#37352f] truncate">{idea.title}</p>
-              {idea.description && (
-                <p className="text-[#787774] mt-0.5 line-clamp-2">
-                  {idea.description}
+              <div className="flex flex-row justify-between items-center">
+                <p className="font-medium text-[#37352f] truncate">
+                  {idea.title}
                 </p>
-              )}
+                <div onClick={() => deleteIdea(idea.ideaId.toString())}>
+                  <Trash2  color="#fa4646" size={15} weight="Filled"  />
+                </div>
+              </div>
             </div>
           ))
         )}
@@ -100,12 +105,11 @@ function AddIdeas({
         </Button>
       )}
 
-      {show && (
-        <form
-          ref={modalRef}
-          action={action}
-          className="mt-2 flex flex-col gap-1.5 "
-        >
+      <form
+        ref={modalRef}
+        action={action}
+        className={cn("mt-2 flex flex-col gap-1.5", !show && "hidden")}
+      >
           <Input
             name="title"
             className="h-8 w-full rounded-lg border-[#e3e2e0] bg-white px-2.5 text-xs md:text-xs"
@@ -143,8 +147,7 @@ function AddIdeas({
             <Plus className="size-3.5" />
             Submit
           </Button>
-        </form>
-      )}
+      </form>
     </div>
   );
 }
