@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Trash2 } from "reicon-react";
 
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deleteIdea } from "@/actions/action";
+import { deleteIdea, updateIdeaStatus, type IdeaState } from "@/actions/action";
 
 
 type Idea = {
@@ -29,19 +29,22 @@ type Idea = {
   createdAt: Date;
 };
 
+const initialState: IdeaState = {};
+
 function AddIdeas({
   action,
   buttonLabel = "New page",
   badgeLabel = "Not started",
   ideas = [],
 }: {
-  action: (formData: FormData) => void;
+  action: (prevState: IdeaState, formData: FormData) => Promise<IdeaState>;
   buttonLabel?: string;
   badgeLabel?: string;
   ideas?: Idea[];
 }) {
   const [show, setShow] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(action, initialState);
   const modalRef = useRef<HTMLFormElement>(null);
 
   const closeInput = () => {
@@ -54,6 +57,13 @@ function AddIdeas({
 
   return (
     <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) =>
+        updateIdeaStatus(
+          Number(e.dataTransfer.getData("text/plain")),
+          badgeLabel,
+        )
+      }
       className={`m-10 w-68 rounded-lg ${badgeLabel === "In progress" ? "bg-[#F3F9FD]" : badgeLabel === "Completed" ? "bg-[#F6F9F7]" : "bg-[#fbfaf9]"} p-2 border-[#E3E2E0] border `}
     >
       <div
@@ -79,6 +89,10 @@ function AddIdeas({
           ideas.map((idea) => (
             <div
               key={idea.ideaId}
+              draggable
+              onDragStart={(e) =>
+                e.dataTransfer.setData("text/plain", idea.ideaId.toString())
+              }
               className="rounded-lg border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-xs hover:bg-[#f7f6f3] cursor-pointer"
             >
               <div className="flex flex-row justify-between items-center">
@@ -107,7 +121,7 @@ function AddIdeas({
 
       <form
         ref={modalRef}
-        action={action}
+        action={formAction}
         className={cn("mt-2 flex flex-col gap-1.5", !show && "hidden")}
       >
           <Input
@@ -140,12 +154,23 @@ function AddIdeas({
             placeholder="Enter description"
           />
 
+          {state?.error && (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="text-xs text-[#fa4646]"
+            >
+              {state.error}
+            </p>
+          )}
+
           <Button
             type="submit"
-            className="h-8 w-full justify-center gap-1.5 rounded-lg bg-[#37352f] px-2.5 text-xs font-medium text-white hover:bg-[#1f1f1d] "
+            disabled={pending}
+            className="h-8 w-full justify-center gap-1.5 rounded-lg bg-[#37352f] px-2.5 text-xs font-medium text-white hover:bg-[#1f1f1d] disabled:opacity-60"
           >
             <Plus className="size-3.5" />
-            Submit
+            {pending ? "Submitting…" : "Submit"}
           </Button>
       </form>
     </div>
