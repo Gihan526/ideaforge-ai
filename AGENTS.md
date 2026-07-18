@@ -1,63 +1,44 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# AGENTS.md
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+## Project overview
 
-# Code style
+This is an idea-management web application. Authenticated users can:
 
-Match the existing code. The conventions below are observed across the repo, not aspirational.
+* Create, update, and delete ideas
+* Move ideas between workflow statuses
+* Have the AI improve an idea's content
+* Generate a system-design graph from an idea, for the user to work from
+* Break the project down into smaller tasks
 
-## Naming
-- Components: PascalCase, kebab-case filenames — `add-ideas.tsx` → `AddIdeas`, `status-select.tsx` → `StatusSelect`.
-- Hooks: `use` prefix, camelCase filenames — `hooks/useClickOutside.ts`, `hooks/useEscapeKey.ts`.
-- Shared constants: camelCase — `ideaStatusOptions`, `ideaStatusLabels` (`status-select.tsx`).
-- DB: snake_case column names mapped to camelCase TS keys — `text("user_id")` → `userId` (`lib/db/schema.ts`).
+## Stack
 
-## Folder structure
-- `app/` — routes (App Router). `components/` — shared components; `components/ui/` — Radix/shadcn primitives.
-- `lib/` — `auth.ts`, `auth-client.ts`, `db/`, `utils.ts`. `hooks/` — client hooks. `actions/` — server actions.
-- Import with the `@/*` alias, never relative `../..` (`tsconfig.json` maps `@/*` → `./*`).
+* Next.js (App Router)
+* TypeScript
+* Drizzle ORM
+* shadcn/ui
+* Package manager: bun (see `bun.lockb` — do not use npm or yarn)
 
-## File top-to-bottom
-Directive (`"use client"` / `"use server"`) → imports → inline `type` defs → the function.
-- Inconsistent export style: `function X() {}` then `export default X;` at the bottom (`add-ideas.tsx`, `header.tsx`, `app/dashboard/page.tsx`) vs. inline `export function` / `export default function` (`status-select.tsx`, `app/page.tsx`, `app/layout.tsx`). Follow the file you're editing.
-- Prop and data types are declared inline at the top of the file, not in a shared `types/` dir (`add-ideas.tsx` `type Idea`, `status-select.tsx` `StatusSelectProps`).
+## Before making changes
 
-## Async & auth
-- `async`/`await` only — no `.then()` chains anywhere.
-- Server-side auth guard is the standard opener: `await auth.api.getSession({ headers: await headers() })` then branch on `if (!session)`. Server actions **throw** (`throw new Error("Unauthorized")`, `actions/action.ts`); pages **redirect** (`redirect("/")`, `app/dashboard/page.tsx`).
+1. Inspect the relevant files first.
+2. If you need documentation for a library or API you're about to touch, fetch only the specific pages relevant to that library/API via the context7 MCP. Do not bulk-load unrelated docs.
+3. Follow the existing patterns in nearby code.
 
-## Error handling
-- Server actions validate then `throw new Error("message")` with a plain string — no try/catch, no custom error classes (`actions/action.ts:12,20`). No client-side error boundaries yet.
+## When making changes
 
-## Comments
-- Sparse. Add a comment only to explain a non-obvious gotcha — e.g. the Supabase pooler port swap in `drizzle.config.ts` and `lib/db/index.ts` (`:6543` → `:5432`).
-- Avoid: commented-out dead code left in files (`add-ideas.tsx:10,19`, `lib/auth.ts:7-9`) — a recurring habit worth breaking, not copying.
+* Keep changes focused on the requested task. Do not modify unrelated code.
+* Reuse existing components and utilities where appropriate.
+* Preserve existing authentication and data-ownership checks — every read/write on an idea must remain scoped to the requesting user.
+* If a file you're already editing contains deprecated APIs or patterns, upgrade them to the current recommended approach (use context7 to confirm what's current). Do not go hunting for deprecated code elsewhere in the codebase as a separate task.
+* Use bun for all commands (`bun install`, `bun run <script>`, etc.).
 
-## Styling
-- Tailwind utility classes inline. Colors are hardcoded hex from a Notion-like palette (`#37352f`, `#e3e2e0`, `#f7f6f3`), not theme tokens.
-- A `cn()` helper exists (`lib/utils.ts`) but is underused. Prefer it over hand-concatenated template literals — see before/after below.
+## After making changes
 
-## Testing
-- No tests, no test runner. Don't invent a framework; if a change needs verification, run `pnpm dev` / `pnpm build`.
+* Run only the checks relevant to the files you changed (see `package.json` for available scripts, e.g. lint/typecheck).
+* Do not run tests.
 
-## Known inconsistency to fix, not spread
-Status values are encoded two ways: the schema defaults to `not_started` (`schema.ts:91`) while actions and `add-ideas.tsx` store display strings like `"Not started"`. `status-select.tsx` already defines the correct `value`/`label` map — reuse it rather than adding a third variant.
+## Key locations
 
-## Before / after (real repo code)
-Ternary-stacked, hand-concatenated classes in `add-ideas.tsx`:
-```tsx
-// before — add-ideas.tsx
-<div className={`mb-2 inline-flex items-center gap-1.5 rounded-full ${badgeLabel === "In progress" ? "bg-[#C1DEF5] text-[#075985]" : badgeLabel === "Completed" ? "bg-[#CFE1D6] text-[#166534]" : "bg-[#E1DFDC] text-[#4B5563]"} px-2.5 py-1 text-xs`}>
-```
-The pattern already established in `status-select.tsx` — data-driven options + `cn()`:
-```tsx
-// after — status-select.tsx
-<SelectTrigger
-  className={cn(
-    "h-8 w-full rounded-lg border-[#e3e2e0] bg-white px-2.5 text-xs font-normal text-[#37352f]",
-    triggerClassName,
-  )}
->
-```
+* Drizzle schema: `lib/db/schema.ts`
+* DB migration command: `bun run db:push`
+* Auth implementation: `better-auth` — config at `lib/auth.ts`, client at `lib/auth-client.ts`
