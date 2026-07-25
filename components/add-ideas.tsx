@@ -19,6 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { deleteIdea, updateIdeaStatus, type IdeaState } from "@/actions/action";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 
 type Idea = {
@@ -44,6 +51,7 @@ function AddIdeas({
 }) {
   const [show, setShow] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [state, formAction, pending] = useActionState(action, initialState);
   const modalRef = useRef<HTMLFormElement>(null);
 
@@ -90,6 +98,7 @@ function AddIdeas({
             <div
               key={idea.ideaId}
               draggable
+              onClick={() => setSelectedIdea(idea)}
               onDragStart={(e) =>
                 e.dataTransfer.setData("text/plain", idea.ideaId.toString())
               }
@@ -99,8 +108,13 @@ function AddIdeas({
                 <p className="font-medium text-[#37352f] truncate">
                   {idea.title}
                 </p>
-                <div onClick={() => deleteIdea(idea.ideaId.toString())}>
-                  <Trash2  color="#fa4646" size={15} weight="Filled"  />
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteIdea(idea.ideaId.toString());
+                  }}
+                >
+                  <Trash2 color="#fa4646" size={15} weight="Filled" />
                 </div>
               </div>
             </div>
@@ -173,6 +187,37 @@ function AddIdeas({
             {pending ? "Submitting…" : "Submit"}
           </Button>
       </form>
+
+      <Sheet
+        open={!!selectedIdea}
+        onOpenChange={(open) => {
+          if (!open) setSelectedIdea(null);
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="!inset-0 !h-full !w-full gap-0 p-0 sm:!max-w-none"
+        >
+          <SheetHeader className="gap-2 border-b border-[#E3E2E0] p-6 pr-14">
+            <SheetTitle className="text-xl font-semibold text-[#37352f]">
+              {selectedIdea?.title}
+            </SheetTitle>
+            <SheetDescription className="text-xs text-[#6b6b6b]">
+              Created{" "}
+              {selectedIdea?.createdAt.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-6">
+            <p className="whitespace-pre-wrap text-sm text-[#37352f]">
+              {selectedIdea?.description || "No description yet."}
+            </p>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
