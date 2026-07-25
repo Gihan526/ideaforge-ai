@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Plus } from "lucide-react";
 import { Trash2 } from "reicon-react";
 
@@ -26,6 +27,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+
+const DesignCanvas = dynamic(() => import("./design-canvas"), { ssr: false });
 
 
 type Idea = {
@@ -196,9 +199,9 @@ function AddIdeas({
       >
         <SheetContent
           side="right"
-          className="!inset-0 !h-full !w-full gap-0 p-0 sm:!max-w-none"
+          className="inset-0! h-full! w-full! gap-0 p-0 sm:max-w-none!"
         >
-          <SheetHeader className="gap-2 border-b border-[#E3E2E0] p-6 pr-14">
+          <SheetHeader className="gap-2 p-6 pb-4 pr-14">
             <SheetTitle className="text-xl font-semibold text-[#37352f]">
               {selectedIdea?.title}
             </SheetTitle>
@@ -211,10 +214,10 @@ function AddIdeas({
               })}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto p-6">
-            <p className="whitespace-pre-wrap text-sm text-[#37352f]">
-              {selectedIdea?.description || "No description yet."}
-            </p>
+          <div className="flex-1 overflow-y-auto p-8">
+            <div className="mx-auto h-[calc(100vh-180px)] min-h-125 w-full max-w-5xl overflow-hidden rounded-lg border border-[#E3E2E0] bg-white shadow-sm">
+              {selectedIdea && <DesignCanvas />}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
