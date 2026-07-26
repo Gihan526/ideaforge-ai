@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { ideas } from "@/lib/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export type IdeaState = {
   error?: string;
@@ -41,7 +41,18 @@ export async function createIdeas(
 }
 
 export async function deleteIdea(ideaId: string) {
-  await db.delete(ideas).where(eq(ideas.ideaId, Number(ideaId)));
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+
+  await db
+    .delete(ideas)
+    .where(
+      and(eq(ideas.ideaId, Number(ideaId)), eq(ideas.userId, session.user.id)),
+    );
   revalidatePath("/dashboard");
 }
 
@@ -55,4 +66,35 @@ export async function updateIdeaStatus(ideaId: number, status: string) {
 
   await db.update(ideas).set({ status }).where(eq(ideas.ideaId, ideaId));
   revalidatePath("/dashboard");
+}
+
+export async function updateIdea(
+  _prevState: IdeaState,
+  formData: FormData,
+): Promise<IdeaState> {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+
+  const ideaId = Number(formData.get("ideaId"));
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+
+  if (!ideaId || Number.isNaN(ideaId)) {
+    return { error: "Invalid idea" };
+  }
+  if (!title) {
+    return { error: "Title is required" };
+  }
+
+  await db
+    .update(ideas)
+    .set({ title, description: description || null })
+    .where(and(eq(ideas.ideaId, ideaId), eq(ideas.userId, session.user.id)));
+
+  revalidatePath("/dashboard");
+  return {};
 }

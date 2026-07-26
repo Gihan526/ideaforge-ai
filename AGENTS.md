@@ -35,7 +35,7 @@ This is an idea-management web application. Authenticated users can:
 ## After making changes
 
 * Run only the checks relevant to the files you changed (see `package.json` for available scripts, e.g. lint/typecheck).
-* Do not run tests.
+* Do not run tests .
 
 ## Key locations
 

@@ -6,6 +6,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -90,18 +91,44 @@ export const ideas = pgTable(
     title: text("title").notNull(),
     status: text("status").default("not_started").notNull(),
     description: text("description"),
+    designGraph: jsonb("design_graph"),
+    diagram: jsonb("diagram"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("ideas_userId_idx").on(table.userId)],
 );
 
+export const todos = pgTable(
+  "todos",
+  {
+    todoId: integer("todo_id").primaryKey().generatedByDefaultAsIdentity(),
+    ideaId: integer("idea_id")
+      .notNull()
+      .references(() => ideas.ideaId, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    steps: jsonb("steps"),
+    order: integer("order").notNull().default(0),
+    completed: boolean("completed").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("todos_ideaId_idx").on(table.ideaId),
+    index("todos_userId_idx").on(table.userId),
+  ],
+);
+
 export const relations = defineRelations(
-  { user, session, account, verification, ideas },
+  { user, session, account, verification, ideas, todos },
   (r) => ({
     user: {
       sessions: r.many.session(),
       accounts: r.many.account(),
       ideas: r.many.ideas(),
+      todos: r.many.todos(),
     },
     session: {
       user: r.one.user({
@@ -121,6 +148,19 @@ export const relations = defineRelations(
       user: r.one.user({
         from: r.ideas.userId,
         to: r.user.id,
+        optional: false,
+      }),
+      todos: r.many.todos(),
+    },
+    todos: {
+      user: r.one.user({
+        from: r.todos.userId,
+        to: r.user.id,
+        optional: false,
+      }),
+      idea: r.one.ideas({
+        from: r.todos.ideaId,
+        to: r.ideas.ideaId,
         optional: false,
       }),
     },
