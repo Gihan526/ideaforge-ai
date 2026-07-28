@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { TechStackItem } from "@/actions/generate-design";
-import { getOrCreateDesignGraph } from "@/actions/design-graph";
+import type { TechStackItem, DesignGraph } from "@/actions/generate-design";
+import {
+  getOrCreateDesignGraph,
+  type DesignInput,
+} from "@/actions/design-graph";
 
 type Idea = {
   ideaId: number;
+  title: string;
+  description: string | null;
+  designGraph?: DesignGraph | null;
 };
 
 const CATEGORY_ORDER: TechStackItem["category"][] = [
@@ -27,23 +33,30 @@ const CATEGORY_LABEL: Record<TechStackItem["category"], string> = {
 };
 
 function TechStack({ idea }: { idea: Idea }) {
-  const [items, setItems] = useState<TechStackItem[] | null>(null);
+  const cachedStack = (idea.designGraph?.techStack as TechStackItem[] | undefined) ?? null;
+  const [fetchedStack, setFetchedStack] = useState<TechStackItem[] | null>(cachedStack);
   const [error, setError] = useState<string | null>(null);
+  const items = cachedStack ?? fetchedStack;
 
   const ideaKey = idea.ideaId;
 
   useEffect(() => {
+    if (cachedStack) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- clear previous result before fetching
-    setItems(null);
+    setFetchedStack(null);
     setError(null);
-    getOrCreateDesignGraph(ideaKey)
+    const input: DesignInput = {
+      title: idea.title,
+      description: idea.description,
+    };
+    getOrCreateDesignGraph(input)
       .then((res) => {
         if (cancelled) return;
         if (res.status === "error") {
           setError(res.error);
         } else {
-          setItems(res.graph.techStack ?? []);
+          setFetchedStack(res.graph.techStack ?? []);
         }
       })
       .catch((e) => {
@@ -53,7 +66,7 @@ function TechStack({ idea }: { idea: Idea }) {
     return () => {
       cancelled = true;
     };
-  }, [ideaKey]);
+  }, [ideaKey, idea.title, idea.description, cachedStack]);
 
   const grouped = useMemo(() => {
     const map = new Map<TechStackItem["category"], TechStackItem[]>();

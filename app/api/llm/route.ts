@@ -2,14 +2,14 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENCODE_API_KEY,
-  baseURL: "https://opencode.ai/zen/go/v1",
+  apiKey: process.env.MISTRAL_API_KEY,
+  baseURL: "https://api.mistral.ai/v1",
 });
 
 export async function GET() {
   try {
     const response = await client.chat.completions.create({
-      model: "deepseek-v4-flash",
+      model: process.env.MISTRAL_MODEL ?? "open-mistral-nemo",
       messages: [
         {
           role: "user",

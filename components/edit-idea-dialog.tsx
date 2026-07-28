@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { updateIdea, type IdeaState } from "@/actions/action";
 
 type Idea = {
   ideaId: number;
@@ -22,24 +21,45 @@ type Idea = {
   createdAt: Date;
 };
 
-const initialState: IdeaState = {};
+export type EditIdeaValues = {
+  title: string;
+  description: string | null;
+};
 
 export default function EditIdeaDialog({
   idea,
   onClose,
+  onSave,
 }: {
   idea: Idea;
   onClose: () => void;
+  onSave: (values: EditIdeaValues) => Promise<{ error?: string }>;
 }) {
-  const [state, formAction, pending] = useActionState(updateIdea, initialState);
-  const wasPending = useRef(false);
+  const [title, setTitle] = useState(idea.title);
+  const [description, setDescription] = useState(idea.description ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (wasPending.current && !pending && !state?.error) {
-      onClose();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError("Title is required");
+      return;
     }
-    wasPending.current = pending;
-  }, [pending, state, onClose]);
+    setSaving(true);
+    const result = await onSave({
+      title: trimmedTitle,
+      description: description.trim() || null,
+    });
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    onClose();
+  };
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -50,8 +70,7 @@ export default function EditIdeaDialog({
             Update the title or description for this idea.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="flex flex-col gap-3">
-          <input type="hidden" name="ideaId" value={idea.ideaId} />
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label
               htmlFor="edit-idea-title"
@@ -62,7 +81,8 @@ export default function EditIdeaDialog({
             <Input
               id="edit-idea-title"
               name="title"
-              defaultValue={idea.title}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               required
               className="h-9 rounded-lg border-[#e3e2e0] bg-white px-3 text-sm"
               placeholder="Enter title"
@@ -78,19 +98,20 @@ export default function EditIdeaDialog({
             <textarea
               id="edit-idea-description"
               name="description"
-              defaultValue={idea.description ?? ""}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               rows={4}
               className="w-full resize-none rounded-lg border border-[#e3e2e0] bg-white px-3 py-2 text-sm text-[#1f1f1d] outline-none transition-colors placeholder:text-[#9b9a97] focus:border-[#37352f] focus:ring-1 focus:ring-[#37352f]"
               placeholder="Enter description"
             />
           </div>
-          {state?.error && (
+          {error && (
             <p
               role="alert"
               aria-live="polite"
               className="text-xs text-[#fa4646]"
             >
-              {state.error}
+              {error}
             </p>
           )}
           <DialogFooter className="mt-1">
@@ -98,17 +119,17 @@ export default function EditIdeaDialog({
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={pending}
+              disabled={saving}
               className="h-9"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={pending}
+              disabled={saving}
               className="h-9 bg-[#37352f] text-white hover:bg-[#1f1f1d]"
             >
-              {pending ? "Saving…" : "Save"}
+              {saving ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </form>

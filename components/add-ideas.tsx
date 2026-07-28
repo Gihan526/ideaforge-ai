@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -30,7 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { deleteIdea, updateIdeaStatus, type IdeaState } from "@/actions/action";
+import {
+  deleteIdea,
+  updateIdeaStatus,
+} from "@/actions/action";
 import { regenerateDesignGraph } from "@/actions/design-graph";
 import { regenerateTodos } from "@/actions/todos";
 import {
@@ -40,6 +43,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import type { DesignGraph } from "@/actions/generate-design";
+import type { TodoItem } from "@/actions/todos";
+import type { EditIdeaValues } from "@/components/edit-idea-dialog";
 
 const DesignCanvas = dynamic(() => import("./design-canvas"), { ssr: false });
 const TechStack = dynamic(() => import("./tech-stack"), { ssr: false });
@@ -47,19 +53,52 @@ const TodosList = dynamic(() => import("./todos-list"), { ssr: false });
 const EditIdeaDialog = dynamic(() => import("./edit-idea-dialog"), { ssr: false });
 
 
-type Idea = {
+export type Idea = {
   ideaId: number;
   title: string;
   description: string | null;
   status: string;
   createdAt: Date;
+  designGraph?: DesignGraph | null;
+  todos?: TodoItem[];
 };
 
-type Todo = {
+export type Todo = {
   todoId: number;
   title: string;
   completed: boolean;
   ideaId: number;
+};
+
+type CreateIdeaInput = {
+  title: string;
+  description: string;
+  status: string;
+};
+
+export type CreateIdeaResult = { ok: true } | { ok: false; reason: "limit"; error: string };
+
+type AddIdeasProps = {
+  buttonLabel?: string;
+  badgeLabel?: string;
+  ideas?: Idea[];
+  todosByIdea?: Map<number, Todo[]>;
+  atLimit?: boolean;
+  onCreate?: (input: CreateIdeaInput) => Promise<CreateIdeaResult>;
+  onDelete?: (ideaId: number) => Promise<void> | void;
+  onUpdateStatus?: (ideaId: number, status: string) => Promise<void> | void;
+  onUpdate?: (
+    ideaId: number,
+    values: EditIdeaValues,
+  ) => Promise<{ error?: string }>;
+  onSaveGraph?: (ideaId: number, graph: DesignGraph) => Promise<void> | void;
+  onSaveTodos?: (ideaId: number, todos: TodoItem[]) => Promise<void> | void;
+  onToggleTodo?: (
+    ideaId: number,
+    todoId: number,
+    completed: boolean,
+  ) => Promise<TodoItem | { error: string }>;
+  onRequestLogin?: () => void;
 };
 
 const statusConfig = {
@@ -83,30 +122,30 @@ const statusConfig = {
   },
 };
 
-const initialState: IdeaState = {};
-
 function AddIdeas({
-  action,
   buttonLabel = "Add task",
   badgeLabel = "Not started",
   ideas = [],
   todosByIdea = new Map(),
-}: {
-  action: (prevState: IdeaState, formData: FormData) => Promise<IdeaState>;
-  buttonLabel?: string;
-  badgeLabel?: string;
-  ideas?: Idea[];
-  todosByIdea?: Map<number, Todo[]>;
-}) {
+  atLimit = false,
+  onCreate,
+  onDelete,
+  onUpdateStatus,
+  onUpdate,
+  onSaveGraph,
+  onSaveTodos,
+  onToggleTodo,
+  onRequestLogin,
+}: AddIdeasProps) {
   const [show, setShow] = useState(false);
   const [selectOpen, setSelectOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [regenerating, setRegenerating] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLFormElement>(null);
-  const wasPendingRef = useRef(false);
   const regenerateAbortRef = useRef(false);
   const regenerateRequestId = useRef(0);
 
@@ -130,19 +169,7 @@ function AddIdeas({
   }, []);
 
   useEffect(() => {
-    if (wasPendingRef.current && !pending && !state?.error) {
-      setShow(false);
-      modalRef.current?.reset();
-      if (pushedRef.current) {
-        pushedRef.current = false;
-        setSheetOpen(false);
-        router.replace(pathname);
-      }
-    }
-    wasPendingRef.current = pending;
-  }, [pending, state, pathname, router]);
-
-  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror URL param into local UI state
     setSheetOpen(!!selectedIdea);
   }, [selectedIdea]);
 
@@ -172,12 +199,32 @@ function AddIdeas({
     regenerateAbortRef.current = false;
     setRegenerating(true);
     try {
-      await Promise.allSettled([
-        regenerateDesignGraph(selectedIdea.ideaId),
-        regenerateTodos(selectedIdea.ideaId),
+      const [graphRes, todosRes] = await Promise.allSettled([
+        regenerateDesignGraph({
+          title: selectedIdea.title,
+          description: selectedIdea.description,
+        }),
+        regenerateTodos({
+          title: selectedIdea.title,
+          description: selectedIdea.description,
+          designGraph: selectedIdea.designGraph ?? null,
+        }),
       ]);
       if (requestId !== regenerateRequestId.current) return;
       if (!regenerateAbortRef.current) {
+        if (graphRes.status === "fulfilled" && graphRes.value.status === "ok") {
+          if (onSaveGraph) {
+            await onSaveGraph(selectedIdea.ideaId, graphRes.value.graph);
+          }
+        }
+        if (
+          todosRes.status === "fulfilled" &&
+          todosRes.value.status === "ok"
+        ) {
+          if (onSaveTodos) {
+            await onSaveTodos(selectedIdea.ideaId, todosRes.value.todos);
+          }
+        }
         setRefreshKey((k) => k + 1);
       }
     } finally {
@@ -191,10 +238,16 @@ function AddIdeas({
   const closeInput = () => {
     if (selectOpen) return;
     setShow(false);
+    setFormError(null);
   };
 
   const openInput = () => {
+    if (atLimit) {
+      if (onRequestLogin) onRequestLogin();
+      return;
+    }
     setShow(true);
+    setFormError(null);
     if (ideaIdParam) {
       pushedRef.current = false;
       setSheetOpen(false);
@@ -205,6 +258,57 @@ function AddIdeas({
   useClickOutside(modalRef, closeInput, show && !selectOpen);
   useEscapeKey(closeInput, show && !selectOpen);
 
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!onCreate) return;
+    const fd = new FormData(e.currentTarget);
+    const title = String(fd.get("title") ?? "").trim();
+    const content = String(fd.get("content") ?? "").trim();
+    const status = String(fd.get("status") ?? "Not started");
+    if (!title || !content) {
+      setFormError("Title and content are required");
+      return;
+    }
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const result = await onCreate({ title, description: content, status });
+      if (!result.ok) {
+        setFormError(result.error);
+        if (result.reason === "limit" && onRequestLogin) {
+          onRequestLogin();
+        }
+        return;
+      }
+      modalRef.current?.reset();
+      setShow(false);
+      router.refresh();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (ideaId: number) => {
+    if (onDelete) {
+      await onDelete(ideaId);
+    } else {
+      await deleteIdea(ideaId.toString());
+    }
+    router.refresh();
+  };
+
+  const handleStatusUpdate = async (
+    ideaId: number,
+    newStatus: string,
+  ) => {
+    if (onUpdateStatus) {
+      await onUpdateStatus(ideaId, newStatus);
+    } else {
+      await updateIdeaStatus(ideaId, newStatus);
+    }
+    router.refresh();
+  };
+
   const config =
     (statusConfig as Record<string, (typeof statusConfig)["Not started"]>)[
       badgeLabel
@@ -214,12 +318,12 @@ function AddIdeas({
   return (
     <div
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) =>
-        updateIdeaStatus(
-          Number(e.dataTransfer.getData("text/plain")),
-          badgeLabel,
-        )
-      }
+      onDrop={(e) => {
+        const id = Number(e.dataTransfer.getData("text/plain"));
+        if (!Number.isNaN(id)) {
+          void handleStatusUpdate(id, badgeLabel);
+        }
+      }}
       className={`flex w-80 shrink-0 flex-col rounded-2xl border border-[#e8e8e6] p-3 ${config.bg}`}
     >
       <div className="mb-3 flex items-center justify-between">
@@ -235,6 +339,7 @@ function AddIdeas({
         <button
           type="button"
           onClick={openInput}
+          aria-label="Add idea"
           className="flex h-7 w-7 items-center justify-center rounded-lg text-[#6b6b6b] transition-colors hover:bg-white hover:text-[#1f1f1d]"
         >
           <Plus className="size-4" />
@@ -290,7 +395,7 @@ function AddIdeas({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteIdea(idea.ideaId.toString());
+                      void handleDelete(idea.ideaId);
                     }}
                     className="flex h-6 w-6 items-center justify-center rounded-lg text-[#b4b4b2] opacity-0 transition-opacity hover:bg-[#fef2f2] hover:text-[#ef4444] group-hover:opacity-100"
                   >
@@ -358,18 +463,19 @@ function AddIdeas({
         className="flex h-9 w-full items-center justify-start gap-2 rounded-xl border border-dashed border-[#d1d1cf] bg-white/60 px-3 text-xs font-semibold text-[#6b6b6b] transition-colors hover:border-[#b4b4b2] hover:bg-white hover:text-[#1f1f1d]"
       >
         <Plus className="size-4" />
-        {buttonLabel}
+        {atLimit ? "Sign in to add more" : buttonLabel}
       </button>
 
       <form
         ref={modalRef}
-        action={formAction}
+        onSubmit={handleFormSubmit}
         className={cn("mt-2 flex flex-col gap-1.5", !show && "hidden")}
       >
           <Input
             name="title"
             className="h-8 w-full rounded-lg border-[#e3e2e0] bg-white px-2.5 text-xs md:text-xs"
             placeholder="Enter title"
+            required
           />
 
           <Select
@@ -392,27 +498,28 @@ function AddIdeas({
           <textarea
             name="content"
             rows={3}
+            required
             className="w-full resize-none rounded-lg border border-[#e3e2e0] bg-white px-2.5 py-1.5 text-xs"
             placeholder="Enter description"
           />
 
-          {state?.error && (
+          {formError && (
             <p
               role="alert"
               aria-live="polite"
               className="text-xs text-[#fa4646]"
             >
-              {state.error}
+              {formError}
             </p>
           )}
 
           <Button
             type="submit"
-            disabled={pending}
+            disabled={submitting}
             className="h-8 w-full justify-center gap-1.5 rounded-lg bg-[#37352f] px-2.5 text-xs font-medium text-white hover:bg-[#1f1f1d] disabled:opacity-60"
           >
             <Plus className="size-3.5" />
-            {pending ? "Submitting…" : "Submit"}
+            {submitting ? "Submitting…" : "Submit"}
           </Button>
       </form>
 
@@ -468,8 +575,13 @@ function AddIdeas({
                 <div className="h-[420px] overflow-hidden rounded-lg border border-[#E3E2E0] bg-white shadow-sm">
                   {selectedIdea && (
                     <DesignCanvas
-                      key={`design-${refreshKey}`}
+                      key={`design-${selectedIdea.ideaId}-${refreshKey}`}
                       idea={selectedIdea}
+                      onSaveGraph={
+                        onSaveGraph
+                          ? (graph) => onSaveGraph(selectedIdea.ideaId, graph)
+                          : undefined
+                      }
                     />
                   )}
                 </div>
@@ -479,7 +591,7 @@ function AddIdeas({
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
                     Stack
                   </p>
-                  <TechStack key={`tech-${refreshKey}`} idea={selectedIdea} />
+                  <TechStack key={`tech-${selectedIdea.ideaId}-${refreshKey}`} idea={selectedIdea} />
                 </div>
               )}
               {selectedIdea && (
@@ -487,7 +599,22 @@ function AddIdeas({
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[#9b9a97]">
                     Build
                   </p>
-                  <TodosList key={`todos-${refreshKey}`} idea={selectedIdea} />
+                  <TodosList
+                    key={`todos-${selectedIdea.ideaId}-${refreshKey}`}
+                    idea={selectedIdea}
+                    initialTodos={selectedIdea.todos ?? []}
+                    onSaveTodos={
+                      onSaveTodos
+                        ? (todos) => onSaveTodos(selectedIdea.ideaId, todos)
+                        : undefined
+                    }
+                    onToggleTodo={
+                      onToggleTodo
+                        ? (todoId, completed) =>
+                            onToggleTodo(selectedIdea.ideaId, todoId, completed)
+                        : undefined
+                    }
+                  />
                 </div>
               )}
             </div>
@@ -499,6 +626,11 @@ function AddIdeas({
           key={editingIdea.ideaId}
           idea={editingIdea}
           onClose={() => setEditingIdea(null)}
+          onSave={
+            onUpdate
+              ? (values) => onUpdate(editingIdea.ideaId, values)
+              : async () => ({ error: "Editing unavailable" })
+          }
         />
       )}
     </div>

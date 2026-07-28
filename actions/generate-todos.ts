@@ -3,8 +3,8 @@
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.OPENCODE_API_KEY,
-  baseURL: "https://opencode.ai/zen/go/v1",
+  apiKey: process.env.MISTRAL_API_KEY,
+  baseURL: "https://api.mistral.ai/v1",
 });
 
 export type GeneratedTodo = {
@@ -93,7 +93,7 @@ ${componentList}
 ${designGraph?.summary ? `Summary: ${designGraph.summary}` : ""}`;
 
   const response = await client.chat.completions.create({
-    model: "deepseek-v4-flash",
+    model: process.env.MISTRAL_MODEL ?? "open-mistral-nemo",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },

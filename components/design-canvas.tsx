@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import {
   getOrCreateDesignGraph,
   regenerateDesignGraph,
+  type DesignInput,
 } from "@/actions/design-graph";
 import { type DesignGraph } from "@/actions/generate-design";
 
@@ -42,6 +43,7 @@ type Idea = {
   ideaId: number;
   title: string;
   description: string | null;
+  designGraph?: DesignGraph | null;
 };
 
 const TIER_COLORS: Record<string, { border: string; fill: string; text: string; chip: string }> = {
@@ -354,14 +356,22 @@ function useLoadingStage(active: boolean) {
   return stage;
 }
 
-function DesignCanvas({ idea }: { idea: Idea }) {
-  const [graph, setGraph] = useState<DesignGraph | null>(null);
-  const [loading, setLoading] = useState(true);
+function DesignCanvas({
+  idea,
+  onSaveGraph,
+}: {
+  idea: Idea;
+  onSaveGraph?: (graph: DesignGraph) => void | Promise<void>;
+}) {
+  const cachedGraph = idea.designGraph ?? null;
+  const [fetchedGraph, setFetchedGraph] = useState<DesignGraph | null>(null);
+  const [loading, setLoading] = useState(!cachedGraph);
   const [error, setError] = useState<string | null>(null);
-  const [isCached, setIsCached] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startedAtRef = useRef<number>(0);
   const requestIdRef = useRef(0);
+  const graph = cachedGraph ?? fetchedGraph;
+  const isCached = !!cachedGraph;
   const stage = useLoadingStage(loading && !isCached);
 
   const ideaKey = idea.ideaId;
@@ -378,21 +388,29 @@ function DesignCanvas({ idea }: { idea: Idea }) {
   }, [loading]);
 
   useEffect(() => {
+    if (cachedGraph) return;
     const requestId = ++requestIdRef.current;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: clear previous result before re-fetching
     setLoading(true);
     setError(null);
-    setGraph(null);
+    setFetchedGraph(null);
 
-    getOrCreateDesignGraph(ideaKey)
-      .then((res) => {
+    const input: DesignInput = {
+      title: idea.title,
+      description: idea.description,
+    };
+
+    getOrCreateDesignGraph(input)
+      .then(async (res) => {
         if (requestId !== requestIdRef.current) return;
         if (res.status === "error") {
           setError(res.error);
           return;
         }
-        setGraph(res.graph);
-        setIsCached(res.cached);
+        setFetchedGraph(res.graph);
+        if (onSaveGraph) {
+          await onSaveGraph(res.graph);
+        }
       })
       .catch((e) => {
         if (requestId !== requestIdRef.current) return;
@@ -402,24 +420,28 @@ function DesignCanvas({ idea }: { idea: Idea }) {
         if (requestId !== requestIdRef.current) return;
         setLoading(false);
       });
-  }, [ideaKey]);
+  }, [ideaKey, idea.title, idea.description, cachedGraph, onSaveGraph]);
 
   const handleRegenerate = () => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
-    setGraph(null);
-    setIsCached(false);
+    setFetchedGraph(null);
 
-    regenerateDesignGraph(ideaKey)
-      .then((res) => {
+    regenerateDesignGraph({
+      title: idea.title,
+      description: idea.description,
+    })
+      .then(async (res) => {
         if (requestId !== requestIdRef.current) return;
         if (res.status === "error") {
           setError(res.error);
           return;
         }
-        setGraph(res.graph);
-        setIsCached(false);
+        setFetchedGraph(res.graph);
+        if (onSaveGraph) {
+          await onSaveGraph(res.graph);
+        }
       })
       .catch((e) => {
         if (requestId !== requestIdRef.current) return;

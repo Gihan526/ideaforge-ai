@@ -1,11 +1,9 @@
-import { createIdeas } from "@/actions/action";
-import AddIdeas from "@/components/add-ideas";
-import SettingsPanel from "@/components/settings-panel";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ideas, todos } from "@/lib/db/schema";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import DashboardView from "@/components/dashboard-view";
+import type { DesignGraph } from "@/actions/generate-design";
 
 async function Page() {
   const session = await auth.api.getSession({
@@ -13,46 +11,35 @@ async function Page() {
   });
 
   if (!session) {
-    redirect("/");
+    return <DashboardView isGuest initialIdeas={[]} initialTodosByIdea={{}} />;
   }
 
   const allIdeas = await db.select().from(ideas);
   const allTodos = await db.select().from(todos);
 
-  const todosByIdea = new Map<number, { todoId: number; title: string; completed: boolean; ideaId: number }[]>();
+  const todosByIdea: Record<number, { todoId: number; title: string; completed: boolean; ideaId: number }[]> = {};
   for (const todo of allTodos) {
-    const list = todosByIdea.get(todo.ideaId) ?? [];
+    const list = todosByIdea[todo.ideaId] ?? [];
     list.push(todo);
-    todosByIdea.set(todo.ideaId, list);
+    todosByIdea[todo.ideaId] = list;
   }
 
-  const notStarted = allIdeas.filter((i) => i.status === "Not started");
-  const inProgress = allIdeas.filter((i) => i.status === "In progress");
-  const completed = allIdeas.filter((i) => i.status === "Completed");
+  const viewIdeas = allIdeas.map((idea) => ({
+    ideaId: idea.ideaId,
+    title: idea.title,
+    description: idea.description,
+    status: idea.status,
+    createdAt: idea.createdAt,
+    designGraph: (idea.designGraph ?? null) as DesignGraph | null,
+    todos: undefined,
+  }));
 
   return (
-    <div className="flex items-start gap-4 p-6">
-      <AddIdeas
-        action={createIdeas}
-        badgeLabel="Not started"
-        buttonLabel="New Idea"
-        ideas={notStarted}
-        todosByIdea={todosByIdea}
-      />
-      <AddIdeas
-        action={createIdeas}
-        badgeLabel="In progress"
-        ideas={inProgress}
-        todosByIdea={todosByIdea}
-      />
-      <AddIdeas
-        action={createIdeas}
-        badgeLabel="Completed"
-        ideas={completed}
-        todosByIdea={todosByIdea}
-      />
-      <SettingsPanel />
-    </div>
+    <DashboardView
+      isGuest={false}
+      initialIdeas={viewIdeas}
+      initialTodosByIdea={todosByIdea}
+    />
   );
 }
 export default Page;

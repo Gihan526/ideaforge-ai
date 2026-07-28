@@ -6,37 +6,70 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 
 import {
   getOrCreateTodos,
-  toggleTodo,
   type TodoItem,
+  type TodosInput,
 } from "@/actions/todos";
+import type { DesignGraph } from "@/actions/generate-design";
 
 type Idea = {
   ideaId: number;
+  title: string;
+  description: string | null;
+  designGraph?: DesignGraph | null;
 };
 
-function TodosList({ idea }: { idea: Idea }) {
-  const [items, setItems] = useState<TodoItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+type TodosListProps = {
+  idea: Idea;
+  initialTodos?: TodoItem[];
+  onSaveTodos?: (todos: TodoItem[]) => void | Promise<void>;
+  onToggleTodo?: (
+    todoId: number,
+    completed: boolean,
+  ) => Promise<TodoItem | { error: string }>;
+};
+
+function TodosList({
+  idea,
+  initialTodos = [],
+  onSaveTodos,
+  onToggleTodo,
+}: TodosListProps) {
+  const hasInitial = initialTodos.length > 0;
+  const [fetchedItems, setFetchedItems] = useState<TodoItem[] | null>(
+    hasInitial ? initialTodos : null,
+  );
+  const [loading, setLoading] = useState(!hasInitial);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const router = useRouter();
+  const items = hasInitial ? initialTodos : fetchedItems;
 
   const ideaKey = idea.ideaId;
 
   useEffect(() => {
+    if (hasInitial) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- clear previous result before fetching
     setLoading(true);
     setError(null);
-    setItems(null);
+    setFetchedItems(null);
 
-    getOrCreateTodos(ideaKey)
-      .then((res) => {
+    const input: TodosInput = {
+      title: idea.title,
+      description: idea.description,
+      designGraph: idea.designGraph ?? null,
+    };
+
+    getOrCreateTodos(input)
+      .then(async (res) => {
         if (cancelled) return;
         if (res.status === "error") {
           setError(res.error);
         } else {
-          setItems(res.todos);
+          setFetchedItems(res.todos);
+          if (!res.cached && onSaveTodos) {
+            await onSaveTodos(res.todos);
+          }
         }
       })
       .catch((e) => {
@@ -51,26 +84,35 @@ function TodosList({ idea }: { idea: Idea }) {
     return () => {
       cancelled = true;
     };
-  }, [ideaKey]);
+  }, [ideaKey, idea.title, idea.description, idea.designGraph, hasInitial, onSaveTodos]);
 
-  const handleToggle = (todoId: number, completed: boolean) => {
-    setItems((prev) =>
+  const handleToggle = async (todoId: number, completed: boolean) => {
+    setFetchedItems((prev) =>
       prev ? prev.map((t) => (t.todoId === todoId ? { ...t, completed } : t)) : prev,
     );
-    toggleTodo(todoId, completed).then((res) => {
-      if (res.status === "error") {
-        setItems((prev) =>
+
+    if (onToggleTodo) {
+      const result = await onToggleTodo(todoId, completed);
+      if ("error" in result) {
+        setFetchedItems((prev) =>
           prev
             ? prev.map((t) =>
                 t.todoId === todoId ? { ...t, completed: !completed } : t,
               )
             : prev,
         );
-        setError(res.error);
+        setError(result.error);
       } else {
+        setFetchedItems((prev) =>
+          prev
+            ? prev.map((t) =>
+                t.todoId === todoId ? { ...t, ...result } : t,
+              )
+            : prev,
+        );
         router.refresh();
       }
-    });
+    }
   };
 
   const toggleExpanded = (todoId: number) => {
